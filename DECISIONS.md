@@ -19,3 +19,12 @@
 8. **Semantic reward.** Pluggable judge callable; default gamma = 0 (Levenshtein only) until a
    judge is chosen.
 9. **Dream routing.** One uniformly random unlocked expert is mixed in at weight 1/(k+1).
+10. **Dream trials.** One disposable LoRA (q_proj, v_proj) is injected once and reset (B = 0)
+    between trials, so it is inert outside a trial. Importance score is the L2 norm of the SFT
+    gradient over that LoRA.
+11. **Where accepted dreams go.** ReST-EM's update step trains on accepted dreams through the wake
+    path, so they enter fast memory and are consolidated by later sleeps like any other input.
+12. **Full last level.** Slots are pre-allocated (the paper's masking trick). When the receiving
+    level has no free slot, that consolidation is skipped and logged.
+13. **CLINC labels.** Intents are mapped to opaque codes ("code 417") so the base model cannot
+    guess them from the name; descriptive names gave 58% zero-shot and hid forgetting.
