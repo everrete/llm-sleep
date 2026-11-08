@@ -1,0 +1,43 @@
+[project]
+name = "llm-sleep"
+version = "0.1.0"
+description = "Sleep for LLMs: offline memory consolidation and dreaming for Hugging Face models"
+readme = "README.md"
+authors = [
+    { name = "retwink", email = "retwink@femboy.cx" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.15.0",
+    "datasets>=5.1.0",
+    "peft>=0.21.2",
+    "rapidfuzz>=3.14.6",
+    "torch==2.11.0",
+    "transformers>=5.22.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
