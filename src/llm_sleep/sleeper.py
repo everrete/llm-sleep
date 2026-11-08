@@ -1,4 +1,4 @@
-from collections import deque
+import random
 
 import torch
 
@@ -12,16 +12,20 @@ class Sleeper:
     """Wake/sleep lifecycle around a Hugging Face causal LM."""
 
     def __init__(self, model, tok, layers, r=64, slots=8, periods=(1, 4, 16, 64, 256), top_k=2,
-                 wake_lr=1e-3, sleep_cfg: SleepConfig | None = None, dream_cfg: DreamConfig | None = None,
-                 prompt_len=32, replay=16, log=print):
+                 wake_lr=1e-3, wake_optim=torch.optim.SGD, sleep_cfg: SleepConfig | None = None, dream_cfg: DreamConfig | None = None,
+                 prompt_len=32, replay=64, sleep_prompts=8, sleep_every=None, log=print):
         self.model, self.tok = model, tok
         inject_cms(model, layers, r=r, slots=slots, periods=periods, top_k=top_k)
-        self.sched = LevelSchedule(model, lr=wake_lr)
+        self.sched = LevelSchedule(model, lr=wake_lr, optim=wake_optim)
         self.sleep_cfg = sleep_cfg or SleepConfig()
         self.dream_cfg = dream_cfg or DreamConfig()
         self.lora = None
         self.prompt_len = prompt_len
-        self.recent = deque(maxlen=replay)
+        self.sleep_every = sleep_every
+        self.replay = replay
+        self.sleep_prompts = sleep_prompts
+        self.memory = []
+        self.seen = 0
         self.log = log
         self.sleeps = []
 
@@ -32,23 +36,45 @@ class Sleeper:
     def _on_due(self, level):
         if level + 1 >= self.sched.n_levels:
             return
+        if self.sleep_every and self.sched.step_i % self.sleep_every[level]:
+            return
         if not all(b.free_slots for b in self.sched.level_blocks(level + 1)):
             self.log(f"level {level + 1} full; skipping consolidation")
             return
-        prompts = list(self.recent)
+        cutoff = self.sched.step_i - self.sched.periods[level]
+        old = [p for t, p in self.memory if t <= cutoff]
+        prompts = random.sample(old, min(self.sleep_prompts, len(old)))
         out = consolidate(self.model, self.tok, self.sched, level, prompts, self.sleep_cfg)
+        if out:
+            self._clear_optim_state(level + 1, out["new_slots"])
         self.sleeps.append({"step": self.sched.step_i, "level": level, **(out or {})})
         if out and self.log:
             d = [h[0] for h in out["history"]]
             self.log(f"sleep L{level}->L{level + 1} at step {self.sched.step_i}: "
                      f"distill {d[0]:.4f} -> {d[-1]:.4f}")
 
+    def _clear_optim_state(self, level, slots):
+        opt = self.sched.optims[level]
+        for b, i in zip(self.sched.level_blocks(level), slots):
+            for p in b.experts[i].parameters():
+                opt.state.pop(p, None)
+
+    def _remember(self, prompt):
+        self.seen += 1
+        item = (self.sched.step_i, prompt.detach())
+        if len(self.memory) < self.replay:
+            self.memory.append(item)
+        else:
+            j = random.randrange(self.seen)
+            if j < self.replay:
+                self.memory[j] = item
+
     def wake(self, ids: torch.Tensor, labels: torch.Tensor | None = None, prompt: torch.Tensor | None = None,
              sleep: bool = True):
         ids = ids.to(self.device)
         self.model.train(False)
         loss = self.model(ids, labels=ids if labels is None else labels.to(self.device)).loss
-        self.recent.append((ids[:, : self.prompt_len] if prompt is None else prompt.to(self.device)).detach())
+        self._remember(ids[:, : self.prompt_len] if prompt is None else prompt.to(self.device))
         self.sched.wake_step(loss, on_due=self._on_due if sleep else None)
         return loss.item()
 

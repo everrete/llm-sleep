@@ -24,6 +24,13 @@ ap.add_argument("--sleep_steps", type=int, default=20)
 ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--out", default="runs")
 ap.add_argument("--opaque", type=int, default=1)
+ap.add_argument("--optim", choices=["sgd", "adam"], default="adam")
+ap.add_argument("--epochs", type=int, default=3)
+ap.add_argument("--only_task0", type=int, default=0)
+ap.add_argument("--slots", type=int, default=64)
+ap.add_argument("--eval_every", type=int, default=0)
+ap.add_argument("--mode", choices=["paper", "transfer"], default="paper")
+ap.add_argument("--sleep_every", default="")
 a = ap.parse_args()
 
 random.seed(a.seed)
@@ -55,9 +62,9 @@ if tok.pad_token is None:
     tok.pad_token = tok.eos_token
 model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.bfloat16).cuda()
 n = model.config.num_hidden_layers
-s = Sleeper(model, tok, layers=[n // 2, n - 4], r=64, slots=24, periods=tuple(int(x) for x in a.periods.split(",")),
-            wake_lr=a.wake_lr, log=None,
-            sleep_cfg=SleepConfig(steps=a.sleep_steps, gen_tokens=8, teacher_samples=2, lti_samples=2, alpha=0.5))
+s = Sleeper(model, tok, layers=[n // 2, n - 4], r=64, slots=a.slots, periods=tuple(int(x) for x in a.periods.split(",")),
+            wake_lr=a.wake_lr, sleep_every=tuple(int(x) for x in a.sleep_every.split(",")) if a.sleep_every else None, wake_optim=torch.optim.Adam if a.optim == "adam" else torch.optim.SGD, log=None,
+            sleep_cfg=SleepConfig(steps=a.sleep_steps, gen_tokens=8, teacher_samples=2, lti_samples=2, alpha=0.5, mode=a.mode))
 
 
 def prompt(text):
@@ -101,16 +108,20 @@ res = {"args": vars(a), "zero_shot": None, "after_task": []}
 res["zero_shot"] = evaluate(intents)
 t0 = time.time()
 for ti, task in enumerate(tasks):
-    exs = [(x, i) for i in task for x in train[i]]
+    exs = [(x, i) for i in task for x in train[i]] * a.epochs
     random.shuffle(exs)
-    for x, i in exs:
+    for k, (x, i) in enumerate(exs):
         full, lab, p = encode(x, i)
-        s.wake(full, labels=lab, prompt=p, sleep=(a.method == "sleep"))
+        loss = s.wake(full, labels=lab, prompt=p, sleep=(a.method == "sleep"))
+        if a.eval_every and (k + 1) % a.eval_every == 0:
+            print(json.dumps({"step": k + 1, "loss": round(loss, 3), "acc": evaluate(task), "sleeps": len(s.sleeps)}), flush=True)
     seen = [i for t in tasks[: ti + 1] for i in t]
     row = {"task": ti, "seen_acc": evaluate(seen), "per_task": per_task_acc(tasks[: ti + 1]),
            "elapsed_s": round(time.time() - t0), "sleeps": len(s.sleeps)}
     res["after_task"].append(row)
     print(json.dumps(row), flush=True)
+    if a.only_task0:
+        raise SystemExit
 
 final = res["after_task"][-1]["per_task"]
 peaks = [max(r["per_task"][k] for r in res["after_task"] if len(r["per_task"]) > k) for k in range(a.tasks)]
@@ -118,6 +129,6 @@ res["final_avg"] = sum(final) / len(final)
 res["forgetting"] = sum(p - f for p, f in zip(peaks[:-1], final[:-1])) / max(1, a.tasks - 1)
 res["peak_vram_gib"] = round(torch.cuda.max_memory_allocated() / 2**30, 2)
 Path(a.out).mkdir(parents=True, exist_ok=True)
-out = Path(a.out) / f"clinc-{a.method}-s{a.seed}-p{a.periods.replace(',', '_')}.json"
+out = Path(a.out) / f"clinc-{a.method}-s{a.seed}-p{a.periods.replace(',', '_')}-{a.optim}{a.wake_lr}-e{a.epochs}-{a.mode}-se{a.sleep_every.replace(',', '_')}.json"
 out.write_text(json.dumps(res, indent=1))
 print("final_avg", round(res["final_avg"], 3), "forgetting", round(res["forgetting"], 3), "->", out)

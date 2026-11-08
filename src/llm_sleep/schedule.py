@@ -1,3 +1,5 @@
+import copy
+
 import torch
 
 from .cms import CMSBlock, cms_chains
@@ -40,9 +42,16 @@ class LevelSchedule:
     @torch.no_grad()
     def prospective(self, l) -> dict:
         """Parameters level l would have after its pending update, without applying it."""
+        opt = self.optims[l]
+        params = self.level_params(l)
+        saved_p = [p.detach().clone() for p in params]
+        saved_state = copy.deepcopy(opt.state_dict())
+        opt.step()
         out = {}
         for b in self.level_blocks(l):
             for n, p in b.base.named_parameters():
-                g = p.grad if p.grad is not None else torch.zeros_like(p)
-                out[(id(b), n)] = p - self.lr * g
+                out[(id(b), n)] = p.detach().clone()
+        for p, s in zip(params, saved_p):
+            p.copy_(s)
+        opt.load_state_dict(saved_state)
         return out

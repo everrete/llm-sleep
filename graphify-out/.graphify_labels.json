@@ -1,12 +1,14 @@
 {
-  "0": "cms.py",
-  "1": "sleeper.py",
-  "2": "consolidate",
-  "3": "inject_cms",
+  "0": "CMSBlock",
+  "1": "dream.py",
+  "2": "consolidate.py",
+  "3": "cms.py",
   "4": "Sleeper",
   "5": "LevelSchedule",
-  "6": "test_consolidate.py",
+  "6": "setup",
   "7": "DECISIONS.md",
   "8": "__init__.py",
-  "9": "llm-sleep"
+  "9": "llm-sleep",
+  "10": "clinc.py",
+  "11": "Tensor"
 }

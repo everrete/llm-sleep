@@ -28,3 +28,15 @@
     level has no free slot, that consolidation is skipped and logged.
 13. **CLINC labels.** Intents are mapped to opaque codes ("code 417") so the base model cannot
     guess them from the name; descriptive names gave 58% zero-shot and hid forgetting.
+14. **Sleep prompts come from older inputs.** Read literally, the student (post-update) is
+    distilled toward the teacher (pre-update). Practised on the inputs being learned right now,
+    that trains the new expert to undo the newest learning; on CLINC the model stayed at chance.
+    Sleep prompts are a reservoir sample of past wake inputs older than the level's period.
+15. **Two consolidation modes.** `paper`: as written (protect pre-update behaviour, commit the
+    fast update). `transfer`: commit the fast update, copy the whole fast block into the new
+    slow expert, then reset the fast block (the "synaptic pruning" of the blog summary).
+16. **Update period and sleep interval are separate.** The paper ties sleep to each level's
+    update boundary, with periods counted in tokens. Counted in examples, a period long enough
+    to make sleep affordable leaves the fast block with almost no updates (3 per CLINC task, no
+    learning). `sleep_every` sets how many steps pass between sleeps of a level; the fast level
+    can still update every step.

@@ -80,3 +80,19 @@ def test_imitation_rl_path_runs():
     out = consolidate(m, Tok(), sched, 0, [a[:, :6]], cfg)
     rewards = [r for _, r in out["history"]]
     assert len(rewards) == 4 and all(0.0 <= r <= 1.0 for r in rewards)
+
+
+def test_transfer_mode_moves_fast_memory_and_resets_it():
+    torch.manual_seed(1)
+    m, a, sched = setup(steps=40, periods=(1, 64))
+    learned = nll(m, a)
+    m(a, labels=a).loss.backward()
+    cfg = SleepConfig(steps=150, lr=3e-2, lam=0.0, alpha=1.0, gen_tokens=16, teacher_samples=16, mode="transfer")
+    consolidate(m, Tok(), sched, 0, [a[:, :8]], cfg)
+    sched.optims[0].step()
+    for b in sched.level_blocks(0):
+        assert b.base.B.abs().max() == 0
+    fresh = tiny_model()
+    base_loss = nll(fresh, a)
+    kept = nll(m, a)
+    assert kept < base_loss - 0.5 * (base_loss - learned)

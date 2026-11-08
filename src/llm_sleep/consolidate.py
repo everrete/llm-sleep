@@ -20,6 +20,7 @@ class SleepConfig:
     lti_samples: int = 2
     temperature: float = 1.0
     teacher_samples: int = 4
+    mode: str = "paper"
 
 
 def _snapshot(blocks):
@@ -59,13 +60,22 @@ def consolidate(model, tok, sched, sender: int, prompts: list[torch.Tensor], cfg
     r_blocks = sched.level_blocks(recv)
     blocks = s_blocks + r_blocks
     grads = {id(p): p.grad.detach().clone() for b in s_blocks for p in b.base.parameters() if p.grad is not None}
+    prosp = sched.prospective(sender)
+    transfer = cfg.mode == "transfer"
+    if transfer:
+        with torch.no_grad():
+            for b in s_blocks:
+                for n, p in b.base.named_parameters():
+                    p.copy_(prosp[(id(b), n)])
     teacher = _snapshot(blocks)
 
-    prosp = sched.prospective(sender)
     with torch.no_grad():
         for b in s_blocks:
-            for n, p in b.base.named_parameters():
-                p.copy_(prosp[(id(b), n)])
+            if transfer:
+                b.base.reset()
+            else:
+                for n, p in b.base.named_parameters():
+                    p.copy_(prosp[(id(b), n)])
             b.reset_experts()
     new = [b.unlock() for b in r_blocks]
 
@@ -139,14 +149,20 @@ def consolidate(model, tok, sched, sender: int, prompts: list[torch.Tensor], cfg
     for h in hooks:
         h.remove()
     student_recv = _snapshot(r_blocks)
-    _load(s_blocks, teacher[: len(s_blocks)])
-    with torch.no_grad():
+    if transfer:
         for b in s_blocks:
-            b.reset_experts()
+            for p in b.parameters():
+                p.grad = None
+                sched.optims[sender].state.pop(p, None)
+    else:
+        _load(s_blocks, teacher[: len(s_blocks)])
+        with torch.no_grad():
+            for b in s_blocks:
+                b.reset_experts()
+        for b in s_blocks:
+            for p in b.parameters():
+                p.grad = grads.get(id(p))
     _load(r_blocks, student_recv)
-    for b in s_blocks:
-        for p in b.parameters():
-            p.grad = grads.get(id(p))
     for p in model.parameters():
         p.requires_grad_(False)
     for l in range(sched.n_levels):
