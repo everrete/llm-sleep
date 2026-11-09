@@ -20,3 +20,20 @@ transfer mode loses most of what the fast block knew at each reset. One seed, sm
 The first guess (sleep starved of data) is ruled out by the thorough rows. Paper mode still
 forgets as much as no sleep while learning each task less well; transfer mode cannot carry a
 task's mapping across the fast-block reset even with 400 distillation steps over all prompts.
+
+## SQuAD knowledge incorporation, Qwen2.5-0.5B, 2026-11-08
+
+Single-passage setting: for each SQuAD validation passage the memory chain is reset, the model
+reads the passage (20 wake passes, Adam 3e-3), then is asked the passage's questions with no
+context. 2 questions per passage are used only for the dream reward; the rest are the test.
+Score: normalized gold answer contained in the greedy answer. 12 passages, seed 0.
+
+| stage | accuracy |
+|---|---|
+| base model, no passage | 0.006 |
+| after reading the passage (fine-tuning only) | 0.175 |
+| after one round of dreaming (8 dreams, top 2 + 1 random, LoRA trials, ReST-EM into fast memory) | **0.248** |
+
+Dreaming adds about 7 points over fine-tuning alone, the same direction as the paper's Table 3,
+where dreaming carries most of the gain. Sleep runs (dream then consolidate, both modes) on the
+first 6 passages are pending.

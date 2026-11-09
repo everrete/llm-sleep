@@ -27,8 +27,8 @@ as written and records every gap it had to fill in `DECISIONS.md`.
 | Knowledge seeding (GJSD + imitation RL) | done, tested on a toy model |
 | Dreaming (random-expert dreams, gradient selection, LoRA trials, ReST-EM) | done, tested |
 | `Sleeper` wake/sleep lifecycle on a real model | done, smoke-tested on Qwen2.5-0.5B (1.5 GB VRAM) |
-| CLINC150 class-incremental benchmark (`scripts/clinc.py`) | running |
-| SQuAD knowledge incorporation | planned |
+| CLINC150 class-incremental benchmark (`scripts/clinc.py`) | done: sleep does not beat no sleep yet, see RESULTS.md |
+| SQuAD knowledge incorporation (`scripts/squad.py`) | dreaming +7 points over fine-tuning; sleep runs pending |
 
 On a toy model, after a fast block's update on new data overwrites what it learned earlier,
 one consolidation keeps roughly 60-70% of the earlier learning; without sleep it keeps none.
