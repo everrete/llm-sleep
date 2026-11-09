@@ -31,6 +31,9 @@ ap.add_argument("--slots", type=int, default=64)
 ap.add_argument("--eval_every", type=int, default=0)
 ap.add_argument("--mode", choices=["paper", "transfer"], default="paper")
 ap.add_argument("--sleep_every", default="")
+ap.add_argument("--sleep_prompts", type=int, default=8)
+ap.add_argument("--teacher_samples", type=int, default=2)
+ap.add_argument("--tag", default="")
 a = ap.parse_args()
 
 random.seed(a.seed)
@@ -63,8 +66,8 @@ if tok.pad_token is None:
 model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.bfloat16).cuda()
 n = model.config.num_hidden_layers
 s = Sleeper(model, tok, layers=[n // 2, n - 4], r=64, slots=a.slots, periods=tuple(int(x) for x in a.periods.split(",")),
-            wake_lr=a.wake_lr, sleep_every=tuple(int(x) for x in a.sleep_every.split(",")) if a.sleep_every else None, wake_optim=torch.optim.Adam if a.optim == "adam" else torch.optim.SGD, log=None,
-            sleep_cfg=SleepConfig(steps=a.sleep_steps, gen_tokens=8, teacher_samples=2, lti_samples=2, alpha=0.5, mode=a.mode))
+            wake_lr=a.wake_lr, sleep_prompts=a.sleep_prompts, sleep_every=tuple(int(x) for x in a.sleep_every.split(",")) if a.sleep_every else None, wake_optim=torch.optim.Adam if a.optim == "adam" else torch.optim.SGD, log=None,
+            sleep_cfg=SleepConfig(steps=a.sleep_steps, gen_tokens=8, teacher_samples=a.teacher_samples, lti_samples=2, alpha=0.5, mode=a.mode))
 
 
 def prompt(text):
@@ -129,6 +132,6 @@ res["final_avg"] = sum(final) / len(final)
 res["forgetting"] = sum(p - f for p, f in zip(peaks[:-1], final[:-1])) / max(1, a.tasks - 1)
 res["peak_vram_gib"] = round(torch.cuda.max_memory_allocated() / 2**30, 2)
 Path(a.out).mkdir(parents=True, exist_ok=True)
-out = Path(a.out) / f"clinc-{a.method}-s{a.seed}-p{a.periods.replace(',', '_')}-{a.optim}{a.wake_lr}-e{a.epochs}-{a.mode}-se{a.sleep_every.replace(',', '_')}.json"
+out = Path(a.out) / f"clinc-{a.method}-s{a.seed}-p{a.periods.replace(',', '_')}-{a.optim}{a.wake_lr}-e{a.epochs}-{a.mode}-se{a.sleep_every.replace(',', '_')}{a.tag}.json"
 out.write_text(json.dumps(res, indent=1))
 print("final_avg", round(res["final_avg"], 3), "forgetting", round(res["forgetting"], 3), "->", out)

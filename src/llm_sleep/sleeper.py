@@ -53,6 +53,22 @@ class Sleeper:
             self.log(f"sleep L{level}->L{level + 1} at step {self.sched.step_i}: "
                      f"distill {d[0]:.4f} -> {d[-1]:.4f}")
 
+    def sleep_now(self, level: int):
+        prompts = [p for _, p in self.memory][-self.sleep_prompts:]
+        out = consolidate(self.model, self.tok, self.sched, level, prompts, self.sleep_cfg)
+        if out:
+            self._clear_optim_state(level + 1, out["new_slots"])
+            self.sleeps.append({"step": self.sched.step_i, "level": level, **out})
+        return out
+
+    def reset(self, chain_state):
+        self.model.load_state_dict(chain_state, strict=False)
+        for o in self.sched.optims:
+            o.state.clear()
+            o.zero_grad(set_to_none=True)
+        self.sched.step_i = 0
+        self.memory, self.seen, self.sleeps = [], 0, []
+
     def _clear_optim_state(self, level, slots):
         opt = self.sched.optims[level]
         for b, i in zip(self.sched.level_blocks(level), slots):
