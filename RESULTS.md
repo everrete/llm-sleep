@@ -52,3 +52,19 @@ vary between runs because dream sampling is random.
 0.33 to 0). `transfer` mode wipes everything, which matches its CLINC result: copying the fast
 block into a fresh expert and resetting the fast block loses the knowledge. Each passage has
 only 1 to 3 test questions, so these numbers are noisy.
+
+### Sequential passages (no reset), 10 passages, 2026-11-09
+
+Memory is kept across passages. After each passage every passage seen so far is re-tested.
+`final_avg` is accuracy over all 10 passages at the end; `forgetting` is the average drop from
+just-learned to final for passages 1-9.
+
+| run | just learned (avg) | final_avg | forgetting |
+|---|---|---|---|
+| fine-tuning only | 0.276 | 0.048 | 0.254 |
+| dreaming | 0.198 | 0.000 | 0.220 |
+| dreaming + `paper` sleep | 0.176 | 0.021 | **0.172** |
+
+All three forget nearly everything earlier. Sleep forgets the least and is the only run that
+kept passage 6 (14 test questions) to the end (0.21 vs 0 for dreaming), but most passages have
+1-3 test questions, so the gaps are within noise. Needs passages with many questions.
