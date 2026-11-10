@@ -28,7 +28,7 @@ as written and records every gap it had to fill in `DECISIONS.md`.
 | Dreaming (random-expert dreams, gradient selection, LoRA trials, ReST-EM) | done, tested |
 | `Sleeper` wake/sleep lifecycle on a real model | done, smoke-tested on Qwen2.5-0.5B (1.5 GB VRAM) |
 | CLINC150 class-incremental benchmark (`scripts/clinc.py`) | done: sleep does not beat no sleep yet, see RESULTS.md |
-| SQuAD knowledge incorporation (`scripts/squad.py`) | dreaming +7 points over fine-tuning; sleep runs pending |
+| SQuAD knowledge incorporation (`scripts/squad.py`) | dreaming +7 points over fine-tuning; `paper` sleep keeps most of it (0.28 -> 0.22), `transfer` loses all |
 
 On a toy model, after a fast block's update on new data overwrites what it learned earlier,
 one consolidation keeps roughly 60-70% of the earlier learning; without sleep it keeps none.

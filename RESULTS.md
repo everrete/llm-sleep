@@ -35,5 +35,20 @@ Score: normalized gold answer contained in the greedy answer. 12 passages, seed 
 | after one round of dreaming (8 dreams, top 2 + 1 random, LoRA trials, ReST-EM into fast memory) | **0.248** |
 
 Dreaming adds about 7 points over fine-tuning alone, the same direction as the paper's Table 3,
-where dreaming carries most of the gain. Sleep runs (dream then consolidate, both modes) on the
-first 6 passages are pending.
+where dreaming carries most of the gain.
+
+### Sleep after dreaming, first 6 passages
+
+Same setup, then `sleep_now(0)` and `sleep_now(1)` (200 distillation steps each). Dream results
+vary between runs because dream sampling is random.
+
+| run | after wake | after dream | after sleep |
+|---|---|---|---|
+| dream only (first 6 of the 12-passage run) | 0.167 | 0.278 | - |
+| sleep, `paper` mode | 0.167 | 0.278 | **0.222** |
+| sleep, `transfer` mode | 0.167 | 0.111 | 0.000 |
+
+`paper` mode keeps most of what dreaming added (5 of 6 passages unchanged; passage 0 dropped from
+0.33 to 0). `transfer` mode wipes everything, which matches its CLINC result: copying the fast
+block into a fresh expert and resetting the fast block loses the knowledge. Each passage has
+only 1 to 3 test questions, so these numbers are noisy.
