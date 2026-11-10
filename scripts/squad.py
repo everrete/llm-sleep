@@ -29,6 +29,10 @@ ap.add_argument("--dream_tokens", type=int, default=96)
 ap.add_argument("--sleep_steps", type=int, default=200)
 ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--sequential", action="store_true")
+ap.add_argument("--layers", default="mid", help="mid | all | every:N")
+ap.add_argument("--rank", type=int, default=64)
+ap.add_argument("--slots", type=int, default=16)
+ap.add_argument("--tag", default="")
 ap.add_argument("--out", default="runs")
 a = ap.parse_args()
 random.seed(a.seed)
@@ -47,7 +51,13 @@ if tok.pad_token is None:
     tok.pad_token = tok.eos_token
 model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.bfloat16).cuda()
 n = model.config.num_hidden_layers
-s = Sleeper(model, tok, layers=[n // 2, n - 4], r=64, slots=16, periods=(1, 8, 64), wake_lr=a.wake_lr,
+if a.layers == "mid":
+    layers = [n // 2, n - 4]
+elif a.layers == "all":
+    layers = list(range(n))
+else:
+    layers = list(range(0, n, int(a.layers.split(":")[1])))
+s = Sleeper(model, tok, layers=layers, r=a.rank, slots=a.slots, periods=(1, 8, 64), wake_lr=a.wake_lr,
             wake_optim=torch.optim.Adam, sleep_prompts=64, log=None,
             sleep_cfg=SleepConfig(steps=a.sleep_steps, gen_tokens=64, teacher_samples=4, lti_samples=2, alpha=0.5,
                                   mode=a.mode),
@@ -126,5 +136,5 @@ if a.sequential:
     summary["forgetting"] = sum(learned[j] - last[j] for j in range(len(last) - 1)) / max(1, len(last) - 1)
 print("summary", json.dumps(summary))
 Path(a.out).mkdir(parents=True, exist_ok=True)
-out = Path(a.out) / f"squad-{a.method}-{a.mode}-s{a.seed}-n{a.passages}-t{a.min_test}{'-seq' if a.sequential else ''}.json"
+out = Path(a.out) / f"squad-{a.method}-{a.mode}-s{a.seed}-n{a.passages}-t{a.min_test}{'-seq' if a.sequential else ''}{a.tag}.json"
 out.write_text(json.dumps({"args": vars(a), "rows": rows, "summary": summary}, indent=1))

@@ -83,3 +83,16 @@ model size the benchmark has a floor effect; it can't separate the methods.
 
 Qwen2.5-1.5B, fine-tuning only, same 10 passages: just learned 0.158, final_avg 0.029,
 forgetting 0.142. The bigger model learns a bit more but still forgets almost all of it.
+
+### Capacity probe, 0.5B, fine-tuning only, 6 sequential passages (min 8 test questions)
+
+| memory placement | rank | lr | epochs | just learned |
+|---|---|---|---|---|
+| 2 layers (default) | 64 | 3e-3 | 20 | 0.083 |
+| all 24 layers | 64 | 3e-3 | 20 | 0.069 |
+| all 24 layers | 64 | 1e-3 | 20 | **0.172** |
+| all 24 layers | 256 | 1e-3 | 20 | 0.021 |
+| all 24 layers | 64 | 1e-3 | 40 | 0.161 |
+
+More memory capacity does not fix it: the best setting learns 17% of a passage's answers. The
+limit is closed-book QA from one raw passage on a 0.5B model, not the size of the memory.
