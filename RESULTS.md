@@ -80,3 +80,6 @@ kept passage 6 (14 test questions) to the end (0.21 vs 0 for dreaming), but most
 With more questions per passage the 0.5B model barely learns a passage in the first place (about
 12% right after reading), so every method ends near zero and the differences are noise. At this
 model size the benchmark has a floor effect; it can't separate the methods.
+
+Qwen2.5-1.5B, fine-tuning only, same 10 passages: just learned 0.158, final_avg 0.029,
+forgetting 0.142. The bigger model learns a bit more but still forgets almost all of it.
