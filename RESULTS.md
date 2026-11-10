@@ -68,3 +68,15 @@ just-learned to final for passages 1-9.
 All three forget nearly everything earlier. Sleep forgets the least and is the only run that
 kept passage 6 (14 test questions) to the end (0.21 vs 0 for dreaming), but most passages have
 1-3 test questions, so the gaps are within noise. Needs passages with many questions.
+
+### Sequential passages, passages with at least 8 test questions, 2026-11-10
+
+| run | just learned (avg) | final_avg | forgetting |
+|---|---|---|---|
+| fine-tuning only | 0.123 | 0.022 | 0.112 |
+| dreaming | 0.080 | 0.004 | 0.085 |
+| dreaming + `paper` sleep | 0.125 | **0.029** | 0.106 |
+
+With more questions per passage the 0.5B model barely learns a passage in the first place (about
+12% right after reading), so every method ends near zero and the differences are noise. At this
+model size the benchmark has a floor effect; it can't separate the methods.
